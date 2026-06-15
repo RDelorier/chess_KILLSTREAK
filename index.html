@@ -1055,6 +1055,15 @@ function equipItem(key){
   renderHUD();
 }
 
+/* ---------- cheat: Shift+I -> +1000 gold ---------- */
+window.addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  if(e.shiftKey&&e.code==='KeyI'){
+    G.coins+=1000;persist();flashCoins();renderHUD();
+    announce('💰 +1000 gold','good');
+  }
+});
+
 /* ---------- boot ---------- */
 applyCosmetics();
 // build empty board placeholder

@@ -52,6 +52,7 @@ body::before{
   font-family:"Syne",sans-serif;font-weight:800;font-size:30px;letter-spacing:-.5px;line-height:1;
   background:linear-gradient(92deg,var(--accent),#fff 55%,var(--accent-2));
   -webkit-background-clip:text;background-clip:text;color:transparent;
+  cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;
 }
 .logo small{display:block;font-family:"DM Mono",monospace;font-weight:400;font-size:10px;letter-spacing:4px;color:var(--muted);-webkit-text-fill-color:var(--muted);margin-top:4px}
 .coinpill{
@@ -1170,15 +1171,23 @@ window.addEventListener('keydown',e=>{
 $('quizSubmit').onclick=submitQuiz;
 $('quizCancel').onclick=()=>$('quiz').classList.remove('show');
 $('quizInput').addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();submitQuiz();}});
-// mobile equivalent of Shift+I: tap the logo 5 times quickly
+// mobile equivalent of Shift+I: 5 quick taps in the top bar.
+// Listen on window in the CAPTURE phase so full-screen overlays (setup/shop/result,
+// z-index:50) can't swallow the taps. Count pointerdown — it fires per tap on
+// touch/mouse/pen and isn't suppressed by the mobile double-tap-zoom gesture the
+// way click is. Scoped to the top-bar rect so tapping the board never triggers it.
 (function(){
-  const logo=document.querySelector('.logo');if(!logo)return;
-  logo.style.cursor='pointer';
+  const bar=document.querySelector('.topbar');if(!bar)return;
+  const evt=('PointerEvent'in window)?'pointerdown':('ontouchstart'in window)?'touchstart':'mousedown';
   let taps=0,timer=null;
-  logo.addEventListener('click',()=>{
-    taps++;clearTimeout(timer);timer=setTimeout(()=>{taps=0;},800);
-    if(taps>=5){taps=0;clearTimeout(timer);if(!$('quiz').classList.contains('show'))openQuiz();}
-  });
+  window.addEventListener(evt,e=>{
+    if($('quiz').classList.contains('show'))return;
+    const pt=(e.touches&&e.touches[0])?e.touches[0]:e;
+    const r=bar.getBoundingClientRect();
+    if(pt.clientX<r.left||pt.clientX>r.right||pt.clientY<r.top||pt.clientY>r.bottom)return;
+    taps++;clearTimeout(timer);timer=setTimeout(()=>{taps=0;},1200);
+    if(taps>=5){taps=0;clearTimeout(timer);openQuiz();}
+  },{capture:true,passive:true});
 })();
 
 /* ---------- boot ---------- */

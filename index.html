@@ -467,7 +467,7 @@ body::after{
   <div class="modal" style="max-width:430px;text-align:center">
     <h2>Codes</h2>
     <div class="sub">Enter a secret code</div>
-    <input id="codeInput" class="quiz-input" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. STUPID_SBEVES" />
+    <input id="codeInput" class="quiz-input" type="text" autocomplete="off" spellcheck="false" placeholder="Enter code…" />
     <div id="codeMsg" style="min-height:18px;font-family:'DM Mono',monospace;font-size:13px;margin:10px 0"></div>
     <div class="btnrow">
       <button class="btn" id="codeCancel">Close</button>
@@ -1032,7 +1032,7 @@ function teleportPiece(dr,dc){
   bd[dr][dc]=null;bd[tr][tc]=pc;
   teleFX(dr,dc,tr,tc);
   G.log.push('🌀');
-  announce('🌀 STUPID SBEVES — enemy teleported!','good');
+  announce('🌀 Enemy teleported!','good');
 }
 function teleFX(fr,fc,tr,tc){
   const cell=cellPx();
@@ -1341,7 +1341,7 @@ $('quizInput').addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key===
 function openCodes(){$('codeInput').value='';$('codeMsg').textContent='';$('codes').classList.add('show');setTimeout(()=>$('codeInput').focus(),30);}
 function applyCode(){
   const k=$('codeInput').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
-  if(k==='STUPIDSBEVES'){G.teleUnlocked=true;persist();renderHUD();$('codes').classList.remove('show');announce('🌀 STUPID SBEVES — Teleport ability unlocked!','good');return;}
+  if(k==='STUPIDSBEVES'){G.teleUnlocked=true;persist();renderHUD();$('codes').classList.remove('show');announce('🌀 Teleport ability unlocked!','good');return;}
   if(k==='RICH'||k==='GOLDRUSH'){G.coins+=1000;persist();flashCoins();renderHUD();$('codes').classList.remove('show');announce('💰 +1000 gold','good');return;}
   if(k==='VAULT'||k==='UNLOCKALL'){unlockAll();$('codes').classList.remove('show');announce('🔓 Everything unlocked!','good');return;}
   $('codeMsg').style.color='var(--bad)';$('codeMsg').textContent='✗ Unknown code.';$('codeInput').select();

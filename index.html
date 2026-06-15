@@ -248,6 +248,10 @@ body::before{
 .promo-grid button{font-size:42px;padding:10px 0;border-radius:14px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;color:#fff;transition:.15s}
 .promo-grid button:hover{border-color:var(--accent);transform:translateY(-3px);background:#221d10}
 
+/* quiz / unlock vault */
+.quiz-input{width:100%;padding:13px 16px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font-family:"DM Mono",monospace;font-size:18px;text-align:center;outline:none}
+.quiz-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px #e8b04b44}
+
 /* announce toast */
 .toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-30px);z-index:60;
   background:linear-gradient(180deg,#1d2230,#12151f);border:1px solid var(--line);color:var(--ink);
@@ -400,6 +404,21 @@ body::before{
     <h2>Promote</h2>
     <div class="sub">Choose your new piece</div>
     <div class="promo-grid" id="promoGrid"></div>
+  </div>
+</div>
+
+<!-- QUIZ / UNLOCK OVERLAY -->
+<div class="overlay" id="quiz">
+  <div class="modal" style="max-width:420px;text-align:center">
+    <h2>🔓 Secret Vault</h2>
+    <div class="sub">Answer correctly to unlock the entire shop</div>
+    <div style="font-size:19px;font-weight:600;margin:4px 0 16px">What is 4 squared?</div>
+    <input id="quizInput" class="quiz-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Type your answer…" />
+    <div id="quizMsg" style="min-height:18px;color:var(--bad);font-family:'DM Mono',monospace;font-size:13px;margin:10px 0"></div>
+    <div class="btnrow">
+      <button class="btn" id="quizCancel">Cancel</button>
+      <button class="btn primary" id="quizSubmit">Unlock 🔓</button>
+    </div>
   </div>
 </div>
 
@@ -1117,14 +1136,40 @@ function equipItem(key){
   renderHUD();
 }
 
-/* ---------- cheat: Shift+I -> +1000 gold ---------- */
+/* ---------- cheat: Shift+I -> quiz that unlocks the whole shop ---------- */
+function openQuiz(){
+  const q=$('quiz');$('quizInput').value='';$('quizMsg').textContent='';
+  q.classList.add('show');setTimeout(()=>$('quizInput').focus(),30);
+}
+function unlockAll(){
+  for(const k in THEMES)if(!G.owned.theme.includes(k))G.owned.theme.push(k);
+  for(const k in SKINS)if(!G.owned.piece.includes(k))G.owned.piece.push(k);
+  for(const k in TRAILS)if(!G.owned.trail.includes(k))G.owned.trail.push(k);
+  persist();renderHUD();
+  if($('shop').classList.contains('show'))renderShop();
+}
+function submitQuiz(){
+  const v=$('quizInput').value.trim().toLowerCase();
+  if(v==='16'||v==='sixteen'){
+    unlockAll();
+    $('quiz').classList.remove('show');
+    announce('🔓 Vault unlocked — every item (and secrets) is yours!','good');
+  }else{
+    $('quizMsg').textContent='✗ Not quite. Try again.';
+    $('quizInput').value='';$('quizInput').focus();
+  }
+}
 window.addEventListener('keydown',e=>{
   if(e.repeat)return;
   if(e.shiftKey&&e.code==='KeyI'){
-    G.coins+=1000;persist();flashCoins();renderHUD();
-    announce('💰 +1000 gold','good');
+    if($('quiz').classList.contains('show'))return;
+    const t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'))return;
+    openQuiz();
   }
 });
+$('quizSubmit').onclick=submitQuiz;
+$('quizCancel').onclick=()=>$('quiz').classList.remove('show');
+$('quizInput').addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();submitQuiz();}});
 
 /* ---------- boot ---------- */
 applyCosmetics();

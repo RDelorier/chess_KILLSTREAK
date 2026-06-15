@@ -145,6 +145,7 @@ body::before{
 @keyframes capFlash{0%{opacity:.9;transform:translate(-50%,-50%) scale(.4)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.3)}}
 .cap-shard{position:absolute;left:0;top:0;width:calc(var(--cell)*.13);height:calc(var(--cell)*.13);border-radius:2px;transform:translate(-50%,-50%);animation:capShard .55s cubic-bezier(.25,.7,.4,1) forwards}
 @keyframes capShard{0%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.3) rotate(180deg)}}
+.cap-emoji{position:absolute;left:0;top:0;font-size:calc(var(--cell)*.4);line-height:1;transform:translate(-50%,-50%);animation:capShard .62s cubic-bezier(.25,.7,.4,1) forwards}
 
 /* coords + turn */
 .coords{display:flex;gap:22px;align-items:center;font-family:"DM Mono",monospace;font-size:12px;color:var(--muted)}
@@ -583,11 +584,11 @@ const SKINS={
   minecraft:{name:'Minecraft ⛏',price:0,cls:'skin-mc',demo:'♟',hidden:true},
 };
 const TRAILS={
-  none:   {name:'None',     price:0,  emoji:''},
-  fire:   {name:'Fire',     price:80, emoji:'🔥'},
-  bolt:   {name:'Lightning',price:120,emoji:'⚡'},
-  spark:  {name:'Sparkle',  price:120,emoji:'✨'},
-  star:   {name:'Cosmic',   price:200,emoji:'💫'},
+  none:   {name:'None',     price:0,  emoji:'',  colors:['#ffffff','#cfd6e6','#9aa3b8']},
+  fire:   {name:'Fire',     price:80, emoji:'🔥',colors:['#ff7a2f','#ff4d2d','#ffd34d']},
+  bolt:   {name:'Lightning',price:120,emoji:'⚡',colors:['#ffe14d','#7fdfff','#ffffff']},
+  spark:  {name:'Sparkle',  price:120,emoji:'✨',colors:['#ffd34d','#fff3c0','#ffffff']},
+  star:   {name:'Cosmic',   price:200,emoji:'💫',colors:['#a98bff','#7a5cff','#c9b8ff']},
 };
 
 const SAVE_KEY='omniArenaSave_v1';
@@ -767,12 +768,17 @@ function ghostPiece(r,c,p){
 }
 function captureFX(r,c){
   const cell=cellPx(),cx=c*cell+cell/2,cy=r*cell+cell/2;
+  const t=TRAILS[G.equipped.trail]||TRAILS.none;       // collision FX matches the equipped trail
+  const cols=(t.colors&&t.colors.length)?t.colors:['#ffffff','#cfd6e6','#9aa3b8'];
   const cont=document.createElement('div');cont.className='cap-fx';
   cont.style.left=cx+'px';cont.style.top=cy+'px';
-  const flash=document.createElement('div');flash.className='cap-flash';cont.appendChild(flash);
-  const ring=document.createElement('div');ring.className='cap-ring';cont.appendChild(ring);
-  const cols=['#ffd34d','#ff7a2f','#fff3c0','#ff5421','#ffae3b'];
-  const n=11;
+  const flash=document.createElement('div');flash.className='cap-flash';
+  flash.style.background=`radial-gradient(circle,#fff 0,${cols[0]} 38%,transparent 68%)`;
+  cont.appendChild(flash);
+  const ring=document.createElement('div');ring.className='cap-ring';
+  ring.style.borderColor=cols[0];ring.style.boxShadow=`0 0 14px ${cols[0]}aa`;
+  cont.appendChild(ring);
+  const n=t.emoji?8:11;
   for(let i=0;i<n;i++){
     const a=(Math.PI*2*i)/n + Math.random()*0.5;
     const dist=cell*(0.42+Math.random()*0.42);
@@ -783,8 +789,20 @@ function captureFX(r,c){
     s.style.animationDelay=(Math.random()*0.05).toFixed(3)+'s';
     cont.appendChild(s);
   }
+  if(t.emoji){
+    const m=6;
+    for(let i=0;i<m;i++){
+      const a=(Math.PI*2*i)/m + 0.3 + Math.random()*0.4;
+      const dist=cell*(0.5+Math.random()*0.45);
+      const e=document.createElement('div');e.className='cap-emoji';e.textContent=t.emoji;
+      e.style.setProperty('--dx',(Math.cos(a)*dist).toFixed(1)+'px');
+      e.style.setProperty('--dy',(Math.sin(a)*dist).toFixed(1)+'px');
+      e.style.animationDelay=(Math.random()*0.06).toFixed(3)+'s';
+      cont.appendChild(e);
+    }
+  }
   fxEl.appendChild(cont);
-  setTimeout(()=>cont.remove(),640);
+  setTimeout(()=>cont.remove(),700);
 }
 
 /* ---------- toast ---------- */

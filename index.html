@@ -1170,6 +1170,16 @@ window.addEventListener('keydown',e=>{
 $('quizSubmit').onclick=submitQuiz;
 $('quizCancel').onclick=()=>$('quiz').classList.remove('show');
 $('quizInput').addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();submitQuiz();}});
+// mobile equivalent of Shift+I: tap the logo 5 times quickly
+(function(){
+  const logo=document.querySelector('.logo');if(!logo)return;
+  logo.style.cursor='pointer';
+  let taps=0,timer=null;
+  logo.addEventListener('click',()=>{
+    taps++;clearTimeout(timer);timer=setTimeout(()=>{taps=0;},800);
+    if(taps>=5){taps=0;clearTimeout(timer);if(!$('quiz').classList.contains('show'))openQuiz();}
+  });
+})();
 
 /* ---------- boot ---------- */
 applyCosmetics();

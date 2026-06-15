@@ -1017,7 +1017,7 @@ function endGame(result,winner){
   else if(result==='insufficient'){icon='⚖️';title='Draw';sub='Insufficient material.';reward=15;G.record.d++;}
   else if(result==='resign'){
     if(G.mode==='ai'){icon='🏳️';title='Resigned';sub='You forfeited the match.';reward=0;G.record.l++;}
-    else{icon='🏳️';title=(winner==='w'?'White':'Black')+' Wins';sub=(winner==='w'?'Black':'White')+' resigned.';reward=50;G.record.w++;}
+    else{icon='🏳️';title=(winner==='w'?'White':'Black')+' Wins';sub=(winner==='w'?'Black':'White')+' resigned — no gold for forfeits.';reward=0;G.record.w++;}
   }
   G.coins+=reward;
   persist();

@@ -10,7 +10,7 @@ const FILE = 'file://' + join(process.cwd(), 'index.html');
 const prof = mkdtempSync(join(tmpdir(), 'arena-'));
 
 const chrome = spawn(CHROME, [
-  '--headless=new', `--remote-debugging-port=${PORT}`,
+  `--remote-debugging-port=${PORT}`,
   `--user-data-dir=${prof}`, '--no-first-run', '--no-default-browser-check',
   '--window-size=1280,900', '--hide-scrollbars', 'about:blank'
 ], { stdio: 'ignore' });

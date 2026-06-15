@@ -8,7 +8,7 @@ const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 9337;
 const FILE = 'file://' + join(process.cwd(), 'index.html');
 const prof = mkdtempSync(join(tmpdir(), 'arena-'));
-const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`,
+const chrome = spawn(CHROME, [`--remote-debugging-port=${PORT}`,
   `--user-data-dir=${prof}`, '--no-first-run', '--no-default-browser-check',
   '--window-size=1280,900', '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
 const sleep = ms => new Promise(r => setTimeout(r, ms));

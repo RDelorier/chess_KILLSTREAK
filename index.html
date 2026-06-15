@@ -303,6 +303,7 @@ body::before{
         <div class="charges" id="charges"></div>
         <div class="fakehint">Arm a piece as bait. If an enemy ends its move <b>adjacent</b> to it next turn, it's vaporized by a counter-blast.</div>
         <button class="btn ghost danger" id="resignBtn" style="margin-top:10px" disabled>⚑ Resign</button>
+        <button class="btn ghost" id="soundBtn" style="margin-top:8px">🔊 Sound: On</button>
       </div>
 
       <div class="panel">
@@ -618,7 +619,7 @@ function loadSave(){
 }
 function persist(){
   try{localStorage.setItem(SAVE_KEY,JSON.stringify({
-    coins:G.coins,owned:G.owned,equipped:G.equipped,record:G.record
+    coins:G.coins,owned:G.owned,equipped:G.equipped,record:G.record,sound:G.sound
   }));}catch(e){}
 }
 
@@ -627,6 +628,7 @@ const G={
   owned:{theme:['wood'],piece:['classic'],trail:['none']},
   equipped:{theme:'wood',piece:'classic',trail:'none'},
   record:{w:0,d:0,l:0},
+  sound:true,
   // runtime
   active:false,mode:'ai',difficulty:2,ultra:false,aiColor:'b',
   state:null,selected:null,legalForSel:[],lastMove:null,
@@ -634,7 +636,7 @@ const G={
   fake:{w:2,b:2},armed:null,arming:false,
   thinking:false,gameOver:false,forceWin:null,
 };
-(function initSave(){const s=loadSave();if(s){G.coins=s.coins??200;G.owned=s.owned||G.owned;G.equipped=s.equipped||G.equipped;G.record=s.record||G.record;}})();
+(function initSave(){const s=loadSave();if(s){G.coins=s.coins??200;G.owned=s.owned||G.owned;G.equipped=s.equipped||G.equipped;G.record=s.record||G.record;if(s.sound!==undefined)G.sound=s.sound;}})();
 
 /* ---------- DOM refs ---------- */
 const $=id=>document.getElementById(id);
@@ -769,6 +771,7 @@ function animateSlide(fr,fc,tr,tc,p,cb){
   setTimeout(()=>{el.remove();cb&&cb();},250);
 }
 function blastFX(r,c){
+  playCaptureSound();
   const cell=cellPx();
   const el=document.createElement('div');el.className='blast';
   el.style.left=(c*cell+cell/2)+'px';el.style.top=(r*cell+cell/2)+'px';
@@ -786,7 +789,40 @@ function ghostPiece(r,c,p){
   fxEl.appendChild(el);
   return el;
 }
+// ---- synthesized capture sound (Web Audio, no asset files) ----
+let _actx=null;
+function audioCtx(){
+  try{
+    if(!_actx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;_actx=new AC();}
+    if(_actx.state==='suspended')_actx.resume();
+  }catch(e){return null;}
+  return _actx;
+}
+function playCaptureSound(){
+  if(!G.sound)return;
+  const ac=audioCtx();if(!ac)return;
+  try{
+    const t=ac.currentTime;
+    const out=ac.createGain();out.gain.value=0.85;out.connect(ac.destination);
+    // impact: short noise burst through a closing lowpass
+    const dur=0.17,n=Math.max(1,Math.floor(ac.sampleRate*dur));
+    const buf=ac.createBuffer(1,n,ac.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.2);
+    const noise=ac.createBufferSource();noise.buffer=buf;
+    const nf=ac.createBiquadFilter();nf.type='lowpass';
+    nf.frequency.setValueAtTime(2800,t);nf.frequency.exponentialRampToValueAtTime(420,t+dur);
+    const ng=ac.createGain();ng.gain.setValueAtTime(0.55,t);ng.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    noise.connect(nf);nf.connect(ng);ng.connect(out);noise.start(t);noise.stop(t+dur);
+    // body: a low triangle "thud" that drops in pitch
+    const osc=ac.createOscillator();osc.type='triangle';
+    osc.frequency.setValueAtTime(320,t);osc.frequency.exponentialRampToValueAtTime(72,t+0.13);
+    const og=ac.createGain();og.gain.setValueAtTime(0.0001,t);
+    og.gain.exponentialRampToValueAtTime(0.5,t+0.008);og.gain.exponentialRampToValueAtTime(0.001,t+0.17);
+    osc.connect(og);og.connect(out);osc.start(t);osc.stop(t+0.18);
+  }catch(e){}
+}
 function captureFX(r,c){
+  playCaptureSound();
   const cell=cellPx(),cx=c*cell+cell/2,cy=r*cell+cell/2;
   const t=TRAILS[G.equipped.trail]||TRAILS.none;       // collision FX matches the equipped trail
   const cols=(t.colors&&t.colors.length)?t.colors:['#ffffff','#cfd6e6','#9aa3b8'];
@@ -1072,6 +1108,10 @@ $('resignBtn').onclick=()=>{
   const loser=G.state.turn;
   endGame('resign', G.mode==='ai'?'b': opp(loser));
 };
+function updateSoundBtn(){const b=$('soundBtn');if(b)b.textContent=(G.sound?'🔊':'🔇')+' Sound: '+(G.sound?'On':'Off');}
+$('soundBtn').onclick=()=>{G.sound=!G.sound;persist();updateSoundBtn();if(G.sound)playCaptureSound();};
+updateSoundBtn();
+document.addEventListener('pointerdown',audioCtx,{once:true}); // unlock audio on first gesture
 $('fakeBtn').onclick=()=>{
   if($('fakeBtn').disabled)return;
   G.arming=!G.arming;

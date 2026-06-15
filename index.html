@@ -112,6 +112,15 @@ body::before{
 .skin-ember .pc.b{color:#ffb38a;text-shadow:0 0 8px #ff5421,0 0 16px #b81f00}
 .skin-void .pc.w{color:#f1ecff;text-shadow:0 0 9px #b69bff,0 0 18px #7a5cff}
 .skin-void .pc.b{color:#caa6ff;text-shadow:0 0 9px #8b46ff,0 0 18px #4f1fb8}
+/* Minecraft secret skin — blocky pixel-shadowed glyphs */
+.skin-mc .pc{font-weight:700;animation:pop .22s cubic-bezier(.2,1.4,.4,1)}
+.skin-mc .pc.w{color:#86cc20;text-shadow:2px 0 #5b8f12,-2px 0 #5b8f12,0 2px #3f6a0c,0 -2px #5b8f12,2px 2px #2c4a07,-2px 2px #2c4a07}
+.skin-mc .pc.b{color:#7a5230;text-shadow:2px 0 #4f3318,-2px 0 #4f3318,0 2px #36230f,0 -2px #4f3318,2px 2px #241608,-2px 2px #241608}
+/* Minecraft board — grass + dirt blocks */
+.theme-mc .sq.light{background:#8ec441;background-image:linear-gradient(0deg,#79b015 0 32%,transparent 32%),repeating-linear-gradient(90deg,#ffffff12 0 7px,transparent 7px 14px),repeating-linear-gradient(0deg,#00000010 0 7px,transparent 7px 14px)}
+.theme-mc .sq.dark{background:#6b4a2b;background-image:repeating-linear-gradient(90deg,#00000020 0 7px,transparent 7px 14px),repeating-linear-gradient(0deg,#ffffff0c 0 7px,transparent 7px 14px)}
+.theme-mc .dot{background:#000a}
+.theme-mc .ring{border-color:#000a}
 .pc.u{position:relative}
 .pc.u::after{content:"";position:absolute;left:50%;bottom:-3%;width:64%;height:64%;transform:translateX(-50%);
   border-radius:50%;border:2px dashed currentColor;opacity:.55;pointer-events:none}
@@ -556,12 +565,14 @@ const THEMES={
   cyber: {name:'Neon Cyber',    price:150,light:'#0a2730',dark:'#05121a',frame:'#0c9b86',glow:'#22e0c8',swatch:'linear-gradient(135deg,#0a2730 50%,#05121a 50%)',cls:'theme-cyber'},
   magma: {name:'Volcanic Magma',price:350,light:'#3a1410',dark:'#190705',frame:'#e0531f',glow:'#ff7a2f',swatch:'linear-gradient(135deg,#5a1d12 50%,#190705 50%)'},
   cosmic:{name:'Cosmic Deep',   price:700,light:'#241a45',dark:'#0d0820',frame:'#7a5cff',glow:'#a98bff',swatch:'linear-gradient(135deg,#2c2360 50%,#0c0820 50%)',cls:'theme-cosmic'},
+  minecraft:{name:'Minecraft',  price:300,light:'#8ec441',dark:'#6b4a2b',frame:'#4f3318',glow:'#86cc20',swatch:'linear-gradient(135deg,#8ec441 50%,#6b4a2b 50%)',cls:'theme-mc'},
 };
 const SKINS={
   classic:{name:'Traditional',price:0,  cls:'skin-classic',demo:'♞'},
   neon:   {name:'Neon Synth', price:100,cls:'skin-neon',demo:'♞'},
   ember:  {name:'Volcanic Ember',price:250,cls:'skin-ember',demo:'♞'},
   void:   {name:'Cosmic Void',price:500,cls:'skin-void',demo:'♞'},
+  minecraft:{name:'Minecraft ⛏',price:0,cls:'skin-mc',demo:'♟',hidden:true},
 };
 const TRAILS={
   none:   {name:'None',     price:0,  emoji:''},
@@ -720,7 +731,7 @@ function dropTrail(fr,fc,tr,tc){
 function animateSlide(fr,fc,tr,tc,p,cb){
   const cell=cellPx();
   const el=document.createElement('div');
-  el.className='slider';el.style.width=el.style.height=cell+'px';
+  el.className='slider '+(SKINS[G.equipped.piece].cls||'');el.style.width=el.style.height=cell+'px';
   el.innerHTML=pieceSpan(p);
   el.querySelector('.pc').style.animation='none';
   el.style.transform=`translate(${fc*cell}px,${fr*cell}px)`;
@@ -775,6 +786,7 @@ function doMove(m){
   animateSlide(m.fr,m.fc,m.tr,m.tc,piece,()=>{
     resolveFake(moverColor,m.tr,m.tc);
     renderAll();
+    checkSecretUnlock();
     afterMove(moverColor);
   });
 }
@@ -900,6 +912,47 @@ function endGame(result,winner){
 }
 function flashCoins(){const p=$('coinpill');p.classList.add('flash');setTimeout(()=>p.classList.remove('flash'),900);}
 
+/* ---------- HIDDEN: pawn-wall unlock ----------
+   When all of one side's remaining pawns (>=3) sit on a single rank with
+   consecutive files and no gaps. The home rank is excluded — pawns never move
+   backward, so a side can only ever be on its home rank at the start, which
+   keeps this from triggering on the opening position. */
+function checkSecretUnlock(){
+  if(G.owned.piece.includes('minecraft'))return; // already unlocked
+  for(const color of['w','b']){
+    const home=color==='w'?6:1;
+    const cols=[];let row=-1,ok=true;
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const p=G.state.board[r][c];
+      if(p&&p.t==='p'&&p.c===color){if(row===-1)row=r;else if(r!==row)ok=false;cols.push(c);}
+    }
+    if(!ok||cols.length<3||row===home||row===-1)continue;
+    cols.sort((a,b)=>a-b);
+    let touching=true;
+    for(let i=1;i<cols.length;i++)if(cols[i]!==cols[i-1]+1){touching=false;break;}
+    if(touching){unlockMinecraft();return;}
+  }
+}
+function unlockMinecraft(){
+  G.owned.piece.push('minecraft');
+  G.equipped.piece='minecraft';
+  persist();
+  applyCosmetics();renderBoard();renderHUD();
+  announce('⛏ SECRET UNLOCKED — Minecraft pieces!','good');
+  blockFX();
+}
+function blockFX(){
+  const cell=cellPx(),icons=['🟩','🟫','💎','🧱','✨','⛏'];
+  for(let i=0;i<28;i++){
+    const el=document.createElement('div');el.className='trail';
+    el.textContent=icons[i%icons.length];
+    el.style.left=(Math.random()*8*cell)+'px';
+    el.style.top=(Math.random()*8*cell)+'px';
+    el.style.animationDelay=(Math.random()*0.55)+'s';
+    fxEl.appendChild(el);setTimeout(()=>el.remove(),1600);
+  }
+}
+
 /* ---------- start match ---------- */
 function startMatch(){
   G.active=true;G.gameOver=false;G.thinking=false;G.forceWin=null;
@@ -959,6 +1012,7 @@ function renderShop(){
   const grid=$('shopGrid');grid.innerHTML='';
   for(const key in data){
     const it=data[key];
+    if(it.hidden && !G.owned[shopTab].includes(key)) continue; // secret items stay locked
     const owned=G.owned[shopTab].includes(key);
     const equipped=G.equipped[shopTab]===key;
     const el=document.createElement('div');

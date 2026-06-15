@@ -380,6 +380,7 @@ body::before{
       <button data-t="theme" class="active">Boards</button>
       <button data-t="piece">Piece Skins</button>
       <button data-t="trail">FX Trails</button>
+      <button data-t="sound">Sounds</button>
     </div>
     <div class="shopgrid" id="shopGrid"></div>
     <button class="btn ghost" id="closeShop" style="margin-top:20px">Close</button>
@@ -625,8 +626,8 @@ function persist(){
 
 const G={
   coins:200,
-  owned:{theme:['wood'],piece:['classic'],trail:['none']},
-  equipped:{theme:'wood',piece:'classic',trail:'none'},
+  owned:{theme:['wood'],piece:['classic'],trail:['none'],sound:['thud']},
+  equipped:{theme:'wood',piece:'classic',trail:'none',sound:'thud'},
   record:{w:0,d:0,l:0},
   sound:true,
   // runtime
@@ -636,7 +637,8 @@ const G={
   fake:{w:2,b:2},armed:null,arming:false,
   thinking:false,gameOver:false,forceWin:null,
 };
-(function initSave(){const s=loadSave();if(s){G.coins=s.coins??200;G.owned=s.owned||G.owned;G.equipped=s.equipped||G.equipped;G.record=s.record||G.record;if(s.sound!==undefined)G.sound=s.sound;}})();
+(function initSave(){const s=loadSave();if(s){G.coins=s.coins??200;G.owned=s.owned||G.owned;G.equipped=s.equipped||G.equipped;G.record=s.record||G.record;if(s.sound!==undefined)G.sound=s.sound;}
+  if(!G.owned.sound)G.owned.sound=['thud'];if(!G.equipped.sound)G.equipped.sound='thud';})();
 
 /* ---------- DOM refs ---------- */
 const $=id=>document.getElementById(id);
@@ -798,29 +800,30 @@ function audioCtx(){
   }catch(e){return null;}
   return _actx;
 }
-function playCaptureSound(){
-  if(!G.sound)return;
-  const ac=audioCtx();if(!ac)return;
-  try{
-    const t=ac.currentTime;
-    const out=ac.createGain();out.gain.value=0.85;out.connect(ac.destination);
-    // impact: short noise burst through a closing lowpass
-    const dur=0.17,n=Math.max(1,Math.floor(ac.sampleRate*dur));
-    const buf=ac.createBuffer(1,n,ac.sampleRate),d=buf.getChannelData(0);
-    for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.2);
-    const noise=ac.createBufferSource();noise.buffer=buf;
-    const nf=ac.createBiquadFilter();nf.type='lowpass';
-    nf.frequency.setValueAtTime(2800,t);nf.frequency.exponentialRampToValueAtTime(420,t+dur);
-    const ng=ac.createGain();ng.gain.setValueAtTime(0.55,t);ng.gain.exponentialRampToValueAtTime(0.001,t+dur);
-    noise.connect(nf);nf.connect(ng);ng.connect(out);noise.start(t);noise.stop(t+dur);
-    // body: a low triangle "thud" that drops in pitch
-    const osc=ac.createOscillator();osc.type='triangle';
-    osc.frequency.setValueAtTime(320,t);osc.frequency.exponentialRampToValueAtTime(72,t+0.13);
-    const og=ac.createGain();og.gain.setValueAtTime(0.0001,t);
-    og.gain.exponentialRampToValueAtTime(0.5,t+0.008);og.gain.exponentialRampToValueAtTime(0.001,t+0.17);
-    osc.connect(og);og.connect(out);osc.start(t);osc.stop(t+0.18);
-  }catch(e){}
-}
+// small synth primitives shared by every sound
+function _env(ac,node,t,vol,dur,atk){atk=atk||0.005;const g=ac.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+atk);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);node.connect(g);return g;}
+function _tone(ac,out,type,f0,f1,dur,vol,t){const o=ac.createOscillator();o.type=type;o.frequency.setValueAtTime(f0,t);if(f1&&f1!==f0)o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);_env(ac,o,t,vol,dur).connect(out);o.start(t);o.stop(t+dur+0.03);}
+function _noise(ac,out,dur,vol,t,ft,fa,fb){const n=Math.max(1,Math.floor(ac.sampleRate*dur));const buf=ac.createBuffer(1,n,ac.sampleRate),d=buf.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,1.6);const s=ac.createBufferSource();s.buffer=buf;let node=s;if(ft){const f=ac.createBiquadFilter();f.type=ft;f.frequency.setValueAtTime(fa,t);if(fb)f.frequency.exponentialRampToValueAtTime(Math.max(1,fb),t+dur);s.connect(f);node=f;}_env(ac,node,t,vol,dur).connect(out);s.start(t);s.stop(t+dur+0.03);}
+
+// capture sound catalog — all synthesized, no asset files
+const SOUNDS={
+  thud:  {name:'Classic Thud', price:0,  play:(a,o,t)=>{_noise(a,o,0.17,0.55,t,'lowpass',2800,420);_tone(a,o,'triangle',320,72,0.13,0.5,t);}},
+  pop:   {name:'Bubble Pop',   price:40, play:(a,o,t)=>{_tone(a,o,'sine',420,1000,0.09,0.5,t);}},
+  blip:  {name:'8-Bit Blip',   price:50, play:(a,o,t)=>{_tone(a,o,'square',700,700,0.05,0.28,t);_tone(a,o,'square',1050,1050,0.06,0.28,t+0.05);}},
+  zap:   {name:'Laser Zap',    price:60, play:(a,o,t)=>{_tone(a,o,'sawtooth',1400,120,0.18,0.3,t);_tone(a,o,'square',2000,300,0.12,0.12,t);}},
+  boing: {name:'Boing',        price:70, play:(a,o,t)=>{_tone(a,o,'sine',700,140,0.26,0.42,t);_tone(a,o,'triangle',350,90,0.26,0.18,t);}},
+  coin:  {name:'Coin Grab',    price:80, play:(a,o,t)=>{_tone(a,o,'square',988,988,0.07,0.3,t);_tone(a,o,'square',1319,1319,0.16,0.3,t+0.07);}},
+  crunch:{name:'Crunch',       price:90, play:(a,o,t)=>{_noise(a,o,0.2,0.5,t,'bandpass',1600,800);_noise(a,o,0.1,0.3,t,'lowpass',600);}},
+  punch: {name:'Heavy Punch',  price:100,play:(a,o,t)=>{_noise(a,o,0.12,0.6,t,'lowpass',500);_tone(a,o,'sine',170,60,0.1,0.5,t);}},
+  clang: {name:'Sword Clang',  price:110,play:(a,o,t)=>{[2400,3170,4350].forEach(f=>_tone(a,o,'square',f,f*0.9,0.28,0.12,t));_noise(a,o,0.06,0.3,t,'highpass',3000);}},
+  power: {name:'Power Down',   price:110,play:(a,o,t)=>{_tone(a,o,'sawtooth',600,55,0.45,0.32,t);}},
+  boom:  {name:'Explosion',    price:130,play:(a,o,t)=>{_noise(a,o,0.4,0.6,t,'lowpass',900,60);_tone(a,o,'sine',120,38,0.35,0.5,t);}},
+  glass: {name:'Glass Shatter',price:130,play:(a,o,t)=>{_noise(a,o,0.25,0.4,t,'highpass',3000);[5200,6300,7100].forEach(f=>_tone(a,o,'triangle',f,f,0.12,0.1,t));}},
+  vapor: {name:'Vaporize',     price:150,play:(a,o,t)=>{_tone(a,o,'sine',200,1900,0.3,0.3,t);_noise(a,o,0.3,0.2,t,'highpass',1200,5000);}},
+  magic: {name:'Magic Chime',  price:160,play:(a,o,t)=>{[784,988,1319].forEach((f,i)=>_tone(a,o,'sine',f,f,0.3,0.22,t+i*0.05));}},
+};
+function playSound(key){const ac=audioCtx();if(!ac)return;const s=SOUNDS[key]||SOUNDS.thud;try{const out=ac.createGain();out.gain.value=0.85;out.connect(ac.destination);s.play(ac,out,ac.currentTime);}catch(e){}}
+function playCaptureSound(){if(!G.sound)return;playSound(G.equipped.sound);}
 function captureFX(r,c){
   playCaptureSound();
   const cell=cellPx(),cx=c*cell+cell/2,cy=r*cell+cell/2;
@@ -1132,7 +1135,7 @@ $('shopTabs').querySelectorAll('button').forEach(b=>{
 });
 function renderShop(){
   $('shopCoins').innerHTML='⊚ '+G.coins;
-  const data=shopTab==='theme'?THEMES:shopTab==='piece'?SKINS:TRAILS;
+  const data=shopTab==='theme'?THEMES:shopTab==='piece'?SKINS:shopTab==='trail'?TRAILS:SOUNDS;
   const grid=$('shopGrid');grid.innerHTML='';
   for(const key in data){
     const it=data[key];
@@ -1144,7 +1147,8 @@ function renderShop(){
     let swatch;
     if(shopTab==='theme')swatch=`<div class="swatch" style="background:${it.swatch}"></div>`;
     else if(shopTab==='piece')swatch=`<div class="swatch ${it.cls}" style="background:radial-gradient(circle,#1c2230,#10131c)"><span class="pc w" style="font-size:30px">♞</span></div>`;
-    else swatch=`<div class="swatch" style="background:radial-gradient(circle,#1c2230,#10131c);font-size:30px">${it.emoji||'∅'}</div>`;
+    else if(shopTab==='trail')swatch=`<div class="swatch" style="background:radial-gradient(circle,#1c2230,#10131c);font-size:30px">${it.emoji||'∅'}</div>`;
+    else swatch=`<div class="swatch" data-preview="${key}" style="background:radial-gradient(circle,#241d10,#12131c);cursor:pointer;flex-direction:column;gap:3px"><span style="font-size:24px">🔊</span><span style="font-size:9px;font-family:'DM Mono',monospace;color:var(--accent);letter-spacing:1px">▶ PREVIEW</span></div>`;
     let actBtn;
     if(equipped)actBtn=`<button class="btn" disabled>Equipped</button>`;
     else if(owned)actBtn=`<button class="btn primary" data-eq="${key}">Equip</button>`;
@@ -1157,9 +1161,10 @@ function renderShop(){
   }
   grid.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>buyItem(b.dataset.buy));
   grid.querySelectorAll('[data-eq]').forEach(b=>b.onclick=()=>equipItem(b.dataset.eq));
+  grid.querySelectorAll('[data-preview]').forEach(el=>el.onclick=()=>playSound(el.dataset.preview));
 }
 function buyItem(key){
-  const data=shopTab==='theme'?THEMES:shopTab==='piece'?SKINS:TRAILS;
+  const data=shopTab==='theme'?THEMES:shopTab==='piece'?SKINS:shopTab==='trail'?TRAILS:SOUNDS;
   const it=data[key];
   if(G.coins<it.price)return;
   G.coins-=it.price;
@@ -1170,6 +1175,7 @@ function buyItem(key){
 }
 function equipItem(key){
   G.equipped[shopTab]=key;
+  if(shopTab==='sound')playSound(key);   // audition the equipped SFX
   persist();
   applyCosmetics();
   renderBoard();
@@ -1186,6 +1192,7 @@ function unlockAll(){
   for(const k in THEMES)if(!G.owned.theme.includes(k))G.owned.theme.push(k);
   for(const k in SKINS)if(!G.owned.piece.includes(k))G.owned.piece.push(k);
   for(const k in TRAILS)if(!G.owned.trail.includes(k))G.owned.trail.push(k);
+  for(const k in SOUNDS)if(!G.owned.sound.includes(k))G.owned.sound.push(k);
   persist();renderHUD();
   if($('shop').classList.contains('show'))renderShop();
 }

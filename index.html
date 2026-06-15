@@ -207,6 +207,15 @@ body::after{
 .btn.fake{background:linear-gradient(180deg,#251a3e,#150f28);border-color:#6b46c0;color:#e2d4ff}
 .btn.fake:hover{box-shadow:0 0 16px -6px #a06bff}
 .btn.fake.on{box-shadow:0 0 0 1px #c4a8ff, 0 0 22px -2px #8b5cff}
+.btn.tele{background:linear-gradient(180deg,#0e2b33,#0a1820);border-color:#1f7e8c;color:#bff2ff}
+.btn.tele:hover{box-shadow:0 0 16px -6px var(--accent-2)}
+.btn.tele.on{box-shadow:0 0 0 1px #6fe6ff,0 0 22px -2px var(--accent-2)}
+/* red codes button, screen corner */
+.code-fab{position:fixed;top:8px;left:8px;z-index:48;width:24px;height:24px;border-radius:50%;
+  border:1px solid #ff8aa0;background:radial-gradient(circle at 35% 30%,#ff6b81,#d10f2e);cursor:pointer;
+  box-shadow:0 0 12px -1px #ff1f44,0 2px 6px #0008;transition:.15s;padding:0}
+.code-fab:hover{transform:scale(1.12);box-shadow:0 0 18px 0 #ff1f44}
+.code-fab:active{transform:scale(.95)}
 .btnrow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .btnrow.three{grid-template-columns:1fr 1fr 1fr}
 
@@ -307,6 +316,7 @@ body::after{
 </style>
 </head>
 <body>
+<button id="codeBtn" class="code-fab" title="Codes" aria-label="Codes"></button>
 <div class="wrap">
   <div class="topbar">
     <div class="brand">
@@ -341,6 +351,7 @@ body::after{
           <button class="btn" id="shopBtn">⊚ Shop</button>
         </div>
         <button class="btn fake" id="fakeBtn" disabled>🎭 Fake-Out <span id="fakeCnt"></span></button>
+        <button class="btn tele" id="teleBtn" style="display:none;margin-top:8px" disabled>🌀 Teleport <span id="teleCnt"></span></button>
         <div class="charges" id="charges"></div>
         <div class="fakehint">Arm a piece as bait. If an enemy ends its move <b>adjacent</b> to it next turn, it's vaporized by a counter-blast.</div>
         <button class="btn ghost danger" id="resignBtn" style="margin-top:10px" disabled>⚑ Resign</button>
@@ -448,6 +459,20 @@ body::after{
     <h2>Promote</h2>
     <div class="sub">Choose your new piece</div>
     <div class="promo-grid" id="promoGrid"></div>
+  </div>
+</div>
+
+<!-- CODES OVERLAY -->
+<div class="overlay" id="codes">
+  <div class="modal" style="max-width:430px;text-align:center">
+    <h2>Codes</h2>
+    <div class="sub">Enter a secret code</div>
+    <input id="codeInput" class="quiz-input" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. STUPID_SBEVES" />
+    <div id="codeMsg" style="min-height:18px;font-family:'DM Mono',monospace;font-size:13px;margin:10px 0"></div>
+    <div class="btnrow">
+      <button class="btn" id="codeCancel">Close</button>
+      <button class="btn primary" id="codeSubmit">Apply</button>
+    </div>
   </div>
 </div>
 
@@ -661,7 +686,7 @@ function loadSave(){
 }
 function persist(){
   try{localStorage.setItem(SAVE_KEY,JSON.stringify({
-    coins:G.coins,owned:G.owned,equipped:G.equipped,record:G.record,sound:G.sound
+    coins:G.coins,owned:G.owned,equipped:G.equipped,record:G.record,sound:G.sound,teleUnlocked:G.teleUnlocked
   }));}catch(e){}
 }
 
@@ -675,10 +700,11 @@ const G={
   active:false,mode:'ai',difficulty:2,ultra:false,aiColor:'b',
   state:null,selected:null,legalForSel:[],lastMove:null,
   captured:{w:[],b:[]},log:[],moveNo:0,
-  fake:{w:2,b:2},armed:null,arming:false,
+  fake:{w:2,b:2},tele:{w:3,b:3},armed:null,arming:false,armKind:'fake',
+  teleUnlocked:false,
   thinking:false,gameOver:false,forceWin:null,
 };
-(function initSave(){const s=loadSave();if(s){G.coins=s.coins??200;G.owned=s.owned||G.owned;G.equipped=s.equipped||G.equipped;G.record=s.record||G.record;if(s.sound!==undefined)G.sound=s.sound;}
+(function initSave(){const s=loadSave();if(s){G.coins=s.coins??200;G.owned=s.owned||G.owned;G.equipped=s.equipped||G.equipped;G.record=s.record||G.record;if(s.sound!==undefined)G.sound=s.sound;if(s.teleUnlocked)G.teleUnlocked=true;}
   if(!G.owned.sound)G.owned.sound=['thud'];if(!G.equipped.sound)G.equipped.sound='thud';})();
 
 /* ---------- DOM refs ---------- */
@@ -725,7 +751,7 @@ function renderBoard(hide){
     let inner='';
     const p=st.board[r][c];
     if(p&&!(hide&&hide.r===r&&hide.c===c))inner+=pieceSpan(p, isClickable(r,c)?'clk':'');
-    if(G.armed&&G.armed.r===r&&G.armed.c===c)inner+='<span class="armed-badge">🎯</span>';
+    if(G.armed&&G.armed.r===r&&G.armed.c===c)inner+='<span class="armed-badge">'+(G.armed.kind==='teleport'?'🌀':'🎯')+'</span>';
     if(targets.has(r*8+c)){inner+= (p?'<span class="ring"></span>':'<span class="dot"></span>');}
     html+=`<div class="${cls}" data-r="${r}" data-c="${c}">${inner}</div>`;
   }
@@ -774,8 +800,17 @@ function renderHUD(){
   const myCharges=G.active?G.fake[G.state.turn]:0;
   const canFake=G.active&&!G.gameOver&&!G.thinking&&myCharges>0&&!(G.mode==='ai'&&G.state.turn===G.aiColor);
   fb.disabled=!canFake;
-  fb.classList.toggle('on',G.arming);
+  fb.classList.toggle('on',G.arming&&G.armKind!=='teleport');
   $('fakeCnt').textContent=G.active?`(${myCharges})`:'';
+  // teleport ability (unlocked via the STUPID_SBEVES code)
+  const tb=$('teleBtn');
+  if(tb){
+    tb.style.display=G.teleUnlocked?'flex':'none';
+    const tc=G.active?G.tele[G.state.turn]:0;
+    tb.disabled=!(G.active&&!G.gameOver&&!G.thinking&&tc>0&&!(G.mode==='ai'&&G.state.turn===G.aiColor));
+    tb.classList.toggle('on',G.arming&&G.armKind==='teleport');
+    $('teleCnt').textContent=G.active?`(${tc})`:'';
+  }
   $('resignBtn').disabled=!G.active||G.gameOver;
   // charges dots
   $('charges').innerHTML = G.active ? [0,1].map(i=>`<span class="charge${i<myCharges?' full':''}"></span>`).join('') : '';
@@ -959,19 +994,58 @@ function resolveFake(moverColor,dr,dc){
   if(ap&&ap.c===a.owner){
     const cheb=Math.max(Math.abs(dr-a.r),Math.abs(dc-a.c));
     if(cheb===1){
-      const victim=bd[dr][dc];
-      if(victim){
-        bd[dr][dc]=null;
-        G.captured[a.owner].push(victim);
-        blastFX(dr,dc);
-        G.log.push('💥');
-        announce('🎭 Counter-blast! Bait sprung.','good');
-        if(victim.t==='k')G.forceWin=a.owner;
+      if(a.kind==='teleport') teleportPiece(dr,dc);
+      else {
+        const victim=bd[dr][dc];
+        if(victim){
+          bd[dr][dc]=null;
+          G.captured[a.owner].push(victim);
+          blastFX(dr,dc);
+          G.log.push('💥');
+          announce('🎭 Counter-blast! Bait sprung.','good');
+          if(victim.t==='k')G.forceWin=a.owner;
+        }
       }
     }
   }
   G.armed=null;
 }
+// STUPID_SBEVES: banish the enemy piece at (dr,dc) to a random square that is
+// NOT on its own (enemy) half and leaves NO king in check.
+function teleportPiece(dr,dc){
+  const bd=G.state.board, pc=bd[dr][dc];
+  if(!pc)return;
+  const enemyHalf = pc.c==='w' ? [4,5,6,7] : [0,1,2,3]; // the mover's own side — off limits
+  const cands=[];
+  for(let r=0;r<8;r++){
+    if(enemyHalf.includes(r))continue;
+    for(let c=0;c<8;c++){
+      if(bd[r][c]||(r===dr&&c===dc))continue;
+      bd[dr][dc]=null;bd[r][c]=pc;
+      const safe=!inCheck(G.state,'w')&&!inCheck(G.state,'b');
+      bd[r][c]=null;bd[dr][dc]=pc;
+      if(safe)cands.push([r,c]);
+    }
+  }
+  if(!cands.length){announce('🌀 Teleport fizzled — nowhere safe to send it.');return;}
+  const [tr,tc]=cands[Math.floor(Math.random()*cands.length)];
+  bd[dr][dc]=null;bd[tr][tc]=pc;
+  teleFX(dr,dc,tr,tc);
+  G.log.push('🌀');
+  announce('🌀 STUPID SBEVES — enemy teleported!','good');
+}
+function teleFX(fr,fc,tr,tc){
+  const cell=cellPx();
+  [[fr,fc,'🌀'],[tr,tc,'✦']].forEach(([r,c,gl])=>{
+    const cont=document.createElement('div');cont.className='cap-fx';
+    cont.style.left=(c*cell+cell/2)+'px';cont.style.top=(r*cell+cell/2)+'px';
+    const ring=document.createElement('div');ring.className='cap-ring';ring.style.borderColor='#b98bff';ring.style.boxShadow='0 0 14px #b98bffaa';cont.appendChild(ring);
+    for(let k=0;k<8;k++){const ang=Math.PI*2*k/8,d=cell*0.5;const e=document.createElement('div');e.className='cap-emoji';e.textContent=gl;e.style.setProperty('--dx',(Math.cos(ang)*d).toFixed(1)+'px');e.style.setProperty('--dy',(Math.sin(ang)*d).toFixed(1)+'px');cont.appendChild(e);}
+    fxEl.appendChild(cont);setTimeout(()=>cont.remove(),720);
+  });
+  teleSound();
+}
+function teleSound(){if(!G.sound)return;const ac=audioCtx();if(!ac)return;try{const out=ac.createGain();out.gain.value=0.7;out.connect(ac.destination);const t=ac.currentTime;_tone(ac,out,'sine',300,1500,0.18,0.25,t);_tone(ac,out,'sine',1500,260,0.2,0.18,t+0.09);}catch(e){}}
 function afterMove(moverColor){
   if(G.forceWin){const w=G.forceWin;G.forceWin=null;return endGame('checkmate',w);}
   const status=gameStatus(G.state);
@@ -997,10 +1071,12 @@ boardEl.addEventListener('click',e=>{
   if(G.arming){
     const p=G.state.board[r][c];
     if(p&&p.c===G.state.turn){
-      G.armed={r,c,owner:G.state.turn};
-      G.fake[G.state.turn]--;
+      const kind=G.armKind||'fake';
+      if(kind==='teleport'){if(G.tele[G.state.turn]<=0)return;G.tele[G.state.turn]--;}
+      else{if(G.fake[G.state.turn]<=0)return;G.fake[G.state.turn]--;}
+      G.armed={r,c,owner:G.state.turn,kind};
       G.arming=false;
-      announce('🎭 Fake-Out armed — now make your move.','good');
+      announce(kind==='teleport'?'🌀 Teleport trap armed — make your move.':'🎭 Fake-Out armed — now make your move.','good');
       renderAll();
     }
     return;
@@ -1123,7 +1199,7 @@ function startMatch(){
   G.state=newState(G.ultra);
   G.selected=null;G.legalForSel=[];G.lastMove=null;
   G.captured={w:[],b:[]};G.log=[];G.moveNo=0;
-  G.fake={w:2,b:2};G.armed=null;G.arming=false;
+  G.fake={w:2,b:2};G.tele={w:3,b:3};G.armed=null;G.arming=false;G.armKind='fake';
   $('setup').classList.remove('show');
   $('result').classList.remove('show');
   renderAll();
@@ -1156,13 +1232,14 @@ function updateSoundBtn(){const b=$('soundBtn');if(b)b.textContent=(G.sound?'�
 $('soundBtn').onclick=()=>{G.sound=!G.sound;persist();updateSoundBtn();if(G.sound)playCaptureSound();};
 updateSoundBtn();
 document.addEventListener('pointerdown',audioCtx,{once:true}); // unlock audio on first gesture
-$('fakeBtn').onclick=()=>{
-  if($('fakeBtn').disabled)return;
-  G.arming=!G.arming;
+function armAbility(kind){
+  if(G.arming&&G.armKind===kind){G.arming=false;}
+  else{G.arming=true;G.armKind=kind;announce(kind==='teleport'?'🌀 Pick one of YOUR pieces to guard.':'🎭 Pick one of YOUR pieces to bait.');}
   G.selected=null;G.legalForSel=[];
-  if(G.arming)announce('🎭 Pick one of YOUR pieces to bait.');
   renderAll();
-};
+}
+$('fakeBtn').onclick=()=>{if(!$('fakeBtn').disabled)armAbility('fake');};
+$('teleBtn').onclick=()=>{if(!$('teleBtn').disabled)armAbility('teleport');};
 
 /* ---------- SHOP ---------- */
 let shopTab='theme';
@@ -1259,6 +1336,20 @@ window.addEventListener('keydown',e=>{
 $('quizSubmit').onclick=submitQuiz;
 $('quizCancel').onclick=()=>$('quiz').classList.remove('show');
 $('quizInput').addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();submitQuiz();}});
+
+/* ---------- codes console (red corner button) ---------- */
+function openCodes(){$('codeInput').value='';$('codeMsg').textContent='';$('codes').classList.add('show');setTimeout(()=>$('codeInput').focus(),30);}
+function applyCode(){
+  const k=$('codeInput').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(k==='STUPIDSBEVES'){G.teleUnlocked=true;persist();renderHUD();$('codes').classList.remove('show');announce('🌀 STUPID SBEVES — Teleport ability unlocked!','good');return;}
+  if(k==='RICH'||k==='GOLDRUSH'){G.coins+=1000;persist();flashCoins();renderHUD();$('codes').classList.remove('show');announce('💰 +1000 gold','good');return;}
+  if(k==='VAULT'||k==='UNLOCKALL'){unlockAll();$('codes').classList.remove('show');announce('🔓 Everything unlocked!','good');return;}
+  $('codeMsg').style.color='var(--bad)';$('codeMsg').textContent='✗ Unknown code.';$('codeInput').select();
+}
+$('codeBtn').onclick=openCodes;
+$('codeCancel').onclick=()=>$('codes').classList.remove('show');
+$('codeSubmit').onclick=applyCode;
+$('codeInput').addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();applyCode();}});
 // mobile equivalent of Shift+I: 5 quick taps in the top bar.
 // Listen on window in the CAPTURE phase so full-screen overlays (setup/shop/result,
 // z-index:50) can't swallow the taps. Count pointerdown — it fires per tap on

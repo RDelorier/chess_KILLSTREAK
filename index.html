@@ -565,7 +565,7 @@ const THEMES={
   cyber: {name:'Neon Cyber',    price:150,light:'#0a2730',dark:'#05121a',frame:'#0c9b86',glow:'#22e0c8',swatch:'linear-gradient(135deg,#0a2730 50%,#05121a 50%)',cls:'theme-cyber'},
   magma: {name:'Volcanic Magma',price:350,light:'#3a1410',dark:'#190705',frame:'#e0531f',glow:'#ff7a2f',swatch:'linear-gradient(135deg,#5a1d12 50%,#190705 50%)'},
   cosmic:{name:'Cosmic Deep',   price:700,light:'#241a45',dark:'#0d0820',frame:'#7a5cff',glow:'#a98bff',swatch:'linear-gradient(135deg,#2c2360 50%,#0c0820 50%)',cls:'theme-cosmic'},
-  minecraft:{name:'Minecraft',  price:300,light:'#8ec441',dark:'#6b4a2b',frame:'#4f3318',glow:'#86cc20',swatch:'linear-gradient(135deg,#8ec441 50%,#6b4a2b 50%)',cls:'theme-mc'},
+  minecraft:{name:'Minecraft',  price:0,hidden:true,light:'#8ec441',dark:'#6b4a2b',frame:'#4f3318',glow:'#86cc20',swatch:'linear-gradient(135deg,#8ec441 50%,#6b4a2b 50%)',cls:'theme-mc'},
 };
 const SKINS={
   classic:{name:'Traditional',price:0,  cls:'skin-classic',demo:'♞'},
@@ -935,10 +935,12 @@ function checkSecretUnlock(){
 }
 function unlockMinecraft(){
   G.owned.piece.push('minecraft');
+  if(!G.owned.theme.includes('minecraft'))G.owned.theme.push('minecraft');
   G.equipped.piece='minecraft';
+  G.equipped.theme='minecraft';
   persist();
   applyCosmetics();renderBoard();renderHUD();
-  announce('⛏ SECRET UNLOCKED — Minecraft pieces!','good');
+  announce('⛏ SECRET UNLOCKED — Minecraft pieces + board!','good');
   blockFX();
 }
 function blockFX(){

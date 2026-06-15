@@ -42,9 +42,10 @@ function step(ok,msg){allOk=ok&&allOk;log.push((ok?'✅':'❌')+' '+msg);console
   await click('#shopTabs button[data-t="piece"]');await sleep(80);
   step(await evalJS(`!document.querySelector('#shopGrid [data-buy="minecraft"]') && !document.querySelector('#shopGrid [data-eq="minecraft"]')`),
     '🔍 Secret Minecraft skin is hidden in shop before unlock');
-  // 2b. Minecraft BOARD is present in shop (theme tab)
+  // 2b. Minecraft BOARD must NOT be purchasable in shop (unlock-only)
   await click('#shopTabs button[data-t="theme"]');await sleep(80);
-  step(await evalJS(`!!document.querySelector('#shopGrid [data-buy="minecraft"]')`), 'Minecraft board appears in shop (themes)');
+  step(await evalJS(`!document.querySelector('#shopGrid [data-buy="minecraft"]') && !document.querySelector('#shopGrid [data-eq="minecraft"]')`),
+    '🔍 Minecraft board is NOT in the shop before unlock');
   await click('#closeShop');await sleep(60);
 
   // 3. arrange a pawn wall: white pawns c4,d-pending,e4; only 3 white pawns total
@@ -64,26 +65,25 @@ function step(ok,msg){allOk=ok&&allOk;log.push((ok?'✅':'❌')+' '+msg);console
   await clickSq(4,3);
   await sleep(400);
 
-  // 4. unlock fired
-  const u=await evalJS(`({owned:G.owned.piece.includes('minecraft'),equipped:G.equipped.piece,cls:document.getElementById('board').className})`);
-  step(u.owned, 'Pawn wall (c4-d4-e4) UNLOCKS Minecraft skin');
-  step(u.equipped==='minecraft', 'Minecraft skin auto-equipped');
-  step(u.cls.includes('skin-mc'), 'Board element carries skin-mc class');
-  await shot('mc1-pieces.png');
+  // 4. unlock fired — grants BOTH skin and board, equips both
+  const u=await evalJS(`({pOwn:G.owned.piece.includes('minecraft'),tOwn:G.owned.theme.includes('minecraft'),
+    pEq:G.equipped.piece,tEq:G.equipped.theme,
+    bCls:document.getElementById('board').className,wCls:document.querySelector('.board-wrap').className})`);
+  step(u.pOwn, 'Pawn wall (c4-d4-e4) UNLOCKS Minecraft skin');
+  step(u.tOwn, 'Same unlock ALSO grants the Minecraft board');
+  step(u.pEq==='minecraft' && u.bCls.includes('skin-mc'), 'Minecraft skin auto-equipped (skin-mc)');
+  step(u.tEq==='minecraft' && u.wCls.includes('theme-mc'), 'Minecraft board auto-equipped (theme-mc)');
+  await shot('mc1-unlocked.png');
 
-  // 5. skin now visible/equipped in shop
+  // 5. both now visible/equipped in shop (owned, not purchasable)
   await click('#shopBtn');await sleep(80);
   await click('#shopTabs button[data-t="piece"]');await sleep(80);
   step(await evalJS(`[...document.querySelectorAll('#shopGrid .nm')].some(n=>/Minecraft/.test(n.textContent))`),
-    'Unlocked Minecraft skin now shows in shop');
-
-  // 6. buy + equip Minecraft board (grant coins to afford 300)
-  await evalJS(`G.coins=900;renderHUD()`);
+    'Unlocked Minecraft skin now shows in shop (owned)');
   await click('#shopTabs button[data-t="theme"]');await sleep(80);
-  await click('#shopGrid [data-buy="minecraft"]');await sleep(120);
-  const b=await evalJS(`({coins:G.coins,eq:G.equipped.theme,wrap:document.querySelector('.board-wrap').className})`);
-  step(b.coins===600 && b.eq==='minecraft' && b.wrap.includes('theme-mc'),
-    `Buy Minecraft board: 900->${b.coins}, equipped=${b.eq}, theme-mc applied`);
+  const t=await evalJS(`({shows:[...document.querySelectorAll('#shopGrid .nm')].some(n=>/Minecraft/.test(n.textContent)),
+    buyable:!!document.querySelector('#shopGrid [data-buy="minecraft"]')})`);
+  step(t.shows && !t.buyable, 'Minecraft board shows in shop as owned (never purchasable)');
   await click('#closeShop');await sleep(80);
   await shot('mc2-board.png');
 
